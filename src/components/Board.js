@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Square from './Square';
 import './Board.css';
 
@@ -13,6 +13,8 @@ function Board() {
   const [results, setResults] = useState([]);
   // State to keep track of the player (assumed to be 'X' initially)
   const [player, setPlayer] = useState('X');
+  // Ref to store the timeout id for the computer's move
+  const computerMoveTimeout = useRef(null);
 
   // Effect to handle the computer's move
   useEffect(() => {
@@ -21,36 +23,50 @@ function Board() {
       // Get the best move for the computer
       const bestMove = getBestMove(squares, player === 'X' ? 'O' : 'X');
       if (bestMove !== null) {
-        // Make the move after a short delay
-        setTimeout(() => handleClick(bestMove, false), 500);
+        // Make the move after a short delay and store the timeout id
+        computerMoveTimeout.current = setTimeout(() => handleClick(bestMove, false), 500);
       }
     }
+    // Clear any pending timeouts when dependencies change
+    return () => {
+      if (computerMoveTimeout.current) {
+        clearTimeout(computerMoveTimeout.current);
+        computerMoveTimeout.current = null;
+      }
+    };
   }, [isXNext, gameOver, squares, player]);
 
   // Function to handle a square being clicked
   const handleClick = (index, isPlayerMove = true) => {
-    const newSquares = squares.slice();
-    // If the game is over or the square is already filled, return
-    if (calculateWinner(squares) || squares[index] || gameOver) {
-      return;
-    }
-    // Set the square to the current player's symbol
-    newSquares[index] = isPlayerMove ? player : (player === 'X' ? 'O' : 'X');
-    setSquares(newSquares);
-    // Toggle the turn
-    setIsXNext(isPlayerMove ? false : true);
-    // Check if there's a winner
-    const winner = calculateWinner(newSquares);
-    if (winner || !newSquares.includes(null)) {
-      // If there's a winner or the board is full, end the game
-      setGameOver(true);
-      // Update the results with the game outcome
-      setResults([...results, {
-        winner: winner ? winner : 'Draw',
-        player,
-        computer: player === 'X' ? 'O' : 'X'
-      }]);
-    }
+    if (gameOver) return;
+    setSquares(prevSquares => {
+      if (calculateWinner(prevSquares) || prevSquares[index]) {
+        return prevSquares;
+      }
+
+      const updatedSquares = prevSquares.slice();
+      // Set the square to the current player's symbol
+      updatedSquares[index] = isPlayerMove ? player : (player === 'X' ? 'O' : 'X');
+
+      const winner = calculateWinner(updatedSquares);
+      if (winner || !updatedSquares.includes(null)) {
+        // If there's a winner or the board is full, end the game
+        setGameOver(true);
+        // Update the results with the game outcome
+        setResults(prevResults => [
+          ...prevResults,
+          {
+            winner: winner ? winner : 'Draw',
+            player,
+            computer: player === 'X' ? 'O' : 'X'
+          }
+        ]);
+      } else {
+        // Toggle the turn
+        setIsXNext(isPlayerMove ? false : true);
+      }
+      return updatedSquares;
+    });
   };
 
   // Function to render a square
@@ -79,6 +95,10 @@ function Board() {
     setSquares(Array(9).fill(null));
     setIsXNext(true);
     setGameOver(false);
+    if (computerMoveTimeout.current) {
+      clearTimeout(computerMoveTimeout.current);
+      computerMoveTimeout.current = null;
+    }
   };
 
   return (
