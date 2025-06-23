@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Square from './Square';
 import './Board.css';
 
@@ -13,6 +13,8 @@ function Board() {
   const [results, setResults] = useState([]);
   // State to keep track of the player (assumed to be 'X' initially)
   const [player, setPlayer] = useState('X');
+  // Ref to store the timeout id for the computer's move
+  const computerMoveTimeout = useRef(null);
 
   // Effect to handle the computer's move
   useEffect(() => {
@@ -21,10 +23,17 @@ function Board() {
       // Get the best move for the computer
       const bestMove = getBestMove(squares, player === 'X' ? 'O' : 'X');
       if (bestMove !== null) {
-        // Make the move after a short delay
-        setTimeout(() => handleClick(bestMove, false), 500);
+        // Make the move after a short delay and store the timeout id
+        computerMoveTimeout.current = setTimeout(() => handleClick(bestMove, false), 500);
       }
     }
+    // Clear any pending timeouts when dependencies change
+    return () => {
+      if (computerMoveTimeout.current) {
+        clearTimeout(computerMoveTimeout.current);
+        computerMoveTimeout.current = null;
+      }
+    };
   }, [isXNext, gameOver, squares, player]);
 
   // Function to handle a square being clicked
@@ -79,6 +88,10 @@ function Board() {
     setSquares(Array(9).fill(null));
     setIsXNext(true);
     setGameOver(false);
+    if (computerMoveTimeout.current) {
+      clearTimeout(computerMoveTimeout.current);
+      computerMoveTimeout.current = null;
+    }
   };
 
   return (
